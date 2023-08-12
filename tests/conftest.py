@@ -1,7 +1,11 @@
+import beartype.claw
 import pytest
 
-import plum
-from plum.promotion import _convert, _promotion_rule
+beartype.claw.beartype_package("plum")
+
+
+import plum  # noqa: E402
+from plum.promotion import _convert, _promotion_rule  # noqa: E402
 
 
 @pytest.fixture
