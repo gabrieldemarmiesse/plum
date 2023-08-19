@@ -103,7 +103,7 @@ class Function(metaclass=_FunctionMeta):
         # Initialise pending and resolved methods.
         self._pending: List[Tuple[Callable, Optional[Signature], int]] = []
         self._resolved: List[Tuple[Callable, Signature, int]] = []
-        self._raw_resolver = Resolver()
+        self._raw_resolver = None
 
     @property
     def owner(self):
@@ -181,6 +181,8 @@ class Function(metaclass=_FunctionMeta):
 
     @property
     def _resolver(self) -> Resolver:
+        if self._raw_resolver is None:
+            self._initialize_resolver()
         self._resolve_pending_registration_if_necessary()
         return self._raw_resolver
 
@@ -196,6 +198,9 @@ class Function(metaclass=_FunctionMeta):
     @_cache.setter
     def _cache(self, new_cache: dict):
         self._raw_cache = new_cache
+
+    def _initialize_resolver(self):
+        self._raw_resolver = Resolver(owner=self.owner, function_name=self._f.__name__)
 
     def _resolve_pending_registration_if_necessary(self):
         if self._pending != []:
@@ -265,7 +270,7 @@ class Function(metaclass=_FunctionMeta):
 
             # Clear resolved.
             self._resolved = []
-            self._resolver = Resolver()
+            self._initialize_resolver()
 
     def register(
         self, f: Callable, signature: Optional[Signature] = None, precedence=0
@@ -357,85 +362,17 @@ class Function(metaclass=_FunctionMeta):
                 args = Signature(*(resolve_type_hint(t) for t in types))
 
             # Cache miss. Run the resolver based on the arguments.
-            method, return_type = self.resolve_method(args)
+            try:
+                method, return_type = self._resolver.resolve(args)
+            except (AmbiguousLookupError, NotFoundLookupError) as e:
+                raise self._enhance_exception(e)
+
             # If the resolver is faithful,
             # then we can perform caching using the types of
             # the arguments. If the resolver is not faithful, then we cannot.
             if self._resolver.is_faithful:
                 self._cache[types] = method, return_type
             return method, return_type
-
-    def resolve_method(
-        self, target: Union[Tuple[object, ...], Signature]
-    ) -> Tuple[Callable, TypeHint]:
-        """Find the method and return type for arguments.
-
-        Args:
-            target (object): Target.
-
-        Returns:
-            function: Method.
-            type: Return type.
-        """
-        try:
-            # Attempt to find the method using the resolver.
-            signature = self._resolver.resolve(target)
-            method = signature.implementation
-            return_type = signature.return_type
-
-        except AmbiguousLookupError as e:
-            raise self._enhance_exception(e)  # Specify this function.
-
-        except NotFoundLookupError as e:
-            e = self._enhance_exception(e)  # Specify this function.
-            method, return_type = self._handle_not_found_lookup_error(e)
-
-        return method, return_type
-
-    def _handle_not_found_lookup_error(
-        self, ex: NotFoundLookupError
-    ) -> Tuple[Callable, TypeHint]:
-        if not self.owner:
-            # Not in a class. Nothing we can do.
-            raise ex
-
-        # In a class. Walk through the classes in the class's MRO, except for
-        # this class, and try to get the method.
-        method = None
-        return_type = object
-
-        for c in self.owner.__mro__[1:]:
-            # Skip the top of the type hierarchy given by `object` and `type`.
-            # We do not suddenly want to fall back to any unexpected default
-            # behaviour.
-            if c in {object, type}:
-                continue
-
-            # We need to check `c.__dict__` here instead of using `hasattr`
-            # since e.g. `c.__le__` will return  even if `c` does not implement
-            # `__le__`!
-            if self._f.__name__ in c.__dict__:
-                method = getattr(c, self._f.__name__)
-            else:
-                # For some reason, coverage fails to catch the `continue`
-                # below. Add the do-nothing `_ = None` fixes this.
-                # TODO: Remove this once coverage properly catches this.
-                _ = None
-                continue
-
-            # Ignore abstract methods.
-            if getattr(method, "__isabstractmethod__", False):
-                method = None
-                continue
-
-            # We found a good candidate. Break.
-            break
-
-        if not method:
-            # If no method has been found after walking through the MRO, raise
-            # the original exception.
-            raise ex
-        return method, return_type
 
     def __call__(self, *args, **kw_args):
         method, return_type = self._resolve_method_with_cache(args=args)

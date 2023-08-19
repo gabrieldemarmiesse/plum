@@ -3,6 +3,7 @@ import sys
 from typing import Callable, List, Tuple, Union
 
 from plum.signature import Signature
+from plum.util import TypeHint
 
 __all__ = ["AmbiguousLookupError", "NotFoundLookupError"]
 
@@ -66,9 +67,11 @@ class Resolver:
         is_faithful (bool): Whether all signatures are faithful or not.
     """
 
-    def __init__(self):
+    def __init__(self, owner, function_name: str):
         self.signatures: List[Signature] = []
         self.is_faithful: bool = True
+        self.owner = owner
+        self.function_name = function_name
 
     def doc(self, exclude: Union[Callable, None] = None) -> str:
         """Concatenate the docstrings of all methods of this function. Remove duplicate
@@ -121,7 +124,28 @@ class Resolver:
     def __len__(self) -> int:
         return len(self.signatures)
 
-    def resolve(self, target: Union[Tuple[object, ...], Signature]) -> Signature:
+    def resolve(
+        self, target: Union[Tuple[object, ...], Signature]
+    ) -> Tuple[Callable, TypeHint]:
+        """Find the method and return type for arguments.
+
+        Args:
+            target (object): Target.
+
+        Returns:
+            function: Method.
+            type: Return type.
+        """
+        try:
+            # Attempt to find the method using the resolver.
+            signature = self._find_signature(target)
+            return signature.implementation, signature.return_type
+        except NotFoundLookupError as e:
+            return self._handle_not_found_lookup_error(e)
+
+    def _find_signature(
+        self, target: Union[Tuple[object, ...], Signature]
+    ) -> Signature:
         """Find the most specific signature that satisfies a target.
 
         Args:
@@ -186,3 +210,48 @@ class Resolver:
                     f"`{target}` is ambiguous among the following:\n"
                     f"  {listed_candidates}"
                 )
+
+    def _handle_not_found_lookup_error(
+        self, ex: NotFoundLookupError
+    ) -> Tuple[Callable, TypeHint]:
+        if not self.owner:
+            # Not in a class. Nothing we can do.
+            raise ex
+
+        # In a class. Walk through the classes in the class's MRO, except for
+        # this class, and try to get the method.
+        method = None
+        return_type = object
+
+        for c in self.owner.__mro__[1:]:
+            # Skip the top of the type hierarchy given by `object` and `type`.
+            # We do not suddenly want to fall back to any unexpected default
+            # behaviour.
+            if c in {object, type}:
+                continue
+
+            # We need to check `c.__dict__` here instead of using `hasattr`
+            # since e.g. `c.__le__` will return  even if `c` does not implement
+            # `__le__`!
+            if self.function_name in c.__dict__:
+                method = getattr(c, self.function_name)
+            else:
+                # For some reason, coverage fails to catch the `continue`
+                # below. Add the do-nothing `_ = None` fixes this.
+                # TODO: Remove this once coverage properly catches this.
+                _ = None
+                continue
+
+            # Ignore abstract methods.
+            if getattr(method, "__isabstractmethod__", False):
+                method = None
+                continue
+
+            # We found a good candidate. Break.
+            break
+
+        if not method:
+            # If no method has been found after walking through the MRO, raise
+            # the original exception.
+            raise ex
+        return method, return_type
