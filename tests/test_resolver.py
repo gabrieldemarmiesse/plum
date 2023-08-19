@@ -5,7 +5,8 @@ import typing
 import pytest
 
 import plum.resolver
-from plum.resolver import AmbiguousLookupError, NotFoundLookupError, Resolver, _document
+from plum.function import _document
+from plum.resolver import AmbiguousLookupError, NotFoundLookupError, Resolver
 from plum.signature import Signature
 
 
