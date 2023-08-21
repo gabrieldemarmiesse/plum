@@ -317,6 +317,27 @@ class Function(metaclass=_FunctionMeta):
         """list[:class:`.signature.Signature`]: All available methods."""
         return self._methods_registry.resolver.signatures
 
+    @property
+    def _resolver(self) -> Resolver:
+        self._resolve_pending_registration_if_necessary()
+        return self._raw_resolver
+
+    @_resolver.setter
+    def _resolver(self, new_resolver: Resolver):
+        self._raw_resolver = new_resolver
+
+    @property
+    def _cache(self) -> dict:
+        self._resolve_pending_registration_if_necessary()
+        return self._raw_cache
+
+    def _clear_cache_dict(self):
+        self._raw_cache.clear()
+
+    def _resolve_pending_registration_if_necessary(self):
+        if self._pending != []:
+            self._resolve_pending_registrations()
+
     def dispatch(
         self: Self, method: Optional[Callable] = None, precedence=0
     ) -> Union[Self, Callable[[Callable], Self]]:
@@ -501,7 +522,7 @@ class Function(metaclass=_FunctionMeta):
             raise ex
         return method, return_type
 
-    def __call__(self, *args, **kw_args):
+    def __call__(self, *args: object, **kw_args: object) -> object:
         method, return_type = self._resolve_method_with_cache(args=args)
         return _convert(method(*args, **kw_args), return_type)
 
