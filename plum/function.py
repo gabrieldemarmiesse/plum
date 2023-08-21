@@ -241,7 +241,7 @@ class Function(metaclass=_FunctionMeta):
         self._owner: Optional[type] = None
 
         # Initialise pending and resolved methods.
-        self._methods_registry = MethodsRegistry(self.__name__)
+        self._methods_registry: MethodsRegistry = MethodsRegistry(self.__name__)
 
     @property
     def owner(self):
@@ -319,24 +319,17 @@ class Function(metaclass=_FunctionMeta):
 
     @property
     def _resolver(self) -> Resolver:
-        self._resolve_pending_registration_if_necessary()
-        return self._raw_resolver
-
-    @_resolver.setter
-    def _resolver(self, new_resolver: Resolver):
-        self._raw_resolver = new_resolver
+        return self._methods_registry.resolver
 
     @property
     def _cache(self) -> dict:
-        self._resolve_pending_registration_if_necessary()
-        return self._raw_cache
+        return self._methods_registry.cache
 
     def _clear_cache_dict(self):
-        self._raw_cache.clear()
+        self._methods_registry.invalidate_resolver_and_cache()
 
-    def _resolve_pending_registration_if_necessary(self):
-        if self._pending != []:
-            self._resolve_pending_registrations()
+    def _resolve_pending_registrations(self):
+        pass
 
     def dispatch(
         self: Self, method: Optional[Callable] = None, precedence=0
@@ -425,32 +418,6 @@ class Function(metaclass=_FunctionMeta):
         # Return a new exception of the same type which incorporates the prefix.
         message = str(e)
         return type(e)(prefix + message[0].lower() + message[1:])
-
-    def _resolve_method_with_cache(
-        self,
-        args: Union[Tuple[object, ...], Signature, None] = None,
-        types: Optional[Tuple[TypeHint, ...]] = None,
-    ) -> Tuple[Callable, TypeHint]:
-        if args is None and types is None:
-            raise ValueError("args and types cannot be None, this should not happen")
-
-        if types is None:
-            # Attempt to use the cache based on the types of the arguments.
-            types = tuple(map(type, args))
-        try:
-            return self._methods_registry.cache[types]
-        except KeyError:
-            if args is None:
-                args = Signature(*(resolve_type_hint(t) for t in types))
-
-            # Cache miss. Run the resolver based on the arguments.
-            method, return_type = self.resolve_method(args)
-            # If the resolver is faithful,
-            # then we can perform caching using the types of
-            # the arguments. If the resolver is not faithful, then we cannot.
-            if self._methods_registry.resolver.is_faithful:
-                self._methods_registry.cache[types] = method, return_type
-            return method, return_type
 
     def resolve_method(
         self, target: Union[Tuple[object, ...], Signature]
