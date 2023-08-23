@@ -136,32 +136,29 @@ def test_cache_clearing():
     def f(x: float):
         return 2
 
-    assert f._methods_registry._cache is None
     assert f._methods_registry._resolver is None
 
     assert f(1) == 1
     # Check that cache is used.
-    assert len(f._methods_registry._cache) == 1
+    assert len(f._methods_registry._resolver._cache) == 1
     assert len(f._methods_registry._resolver) == 2
 
     # Clear via the dispatcher.
     dispatch.clear_cache()
-    assert f._methods_registry._cache is None
     assert f._methods_registry._resolver is None
 
     # Run the function again.
     assert f(1) == 1
-    assert len(f._methods_registry._cache) == 1
+    assert len(f._methods_registry._resolver._cache) == 1
     assert len(f._methods_registry._resolver) == 2
 
     # Clear via `clear_all_cache`.
     clear_all_cache()
-    assert f._methods_registry._cache is None
     assert f._methods_registry._resolver is None
 
     # Run the function one last time.
     assert f(1) == 1
-    assert len(f._methods_registry._cache) == 1
+    assert len(f._methods_registry._resolver._cache) == 1
     assert len(f._methods_registry._resolver) == 2
 
 
@@ -179,4 +176,4 @@ def test_cache_unfaithful():
     # Since `f` is not faithful, no cache should be accumulated.
     assert f(1) == 1
     assert f([1]) == 2
-    assert len(f._methods_registry._cache) == 0
+    assert len(f._methods_registry._resolver._cache) == 0
