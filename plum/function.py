@@ -3,7 +3,7 @@ import sys
 import textwrap
 from functools import wraps
 from types import MethodType
-from typing import Any, Callable, List, Optional, Tuple, TypeVar, Union
+from typing import Any, Callable, Iterator, List, Optional, Tuple, TypeVar, Union
 
 from .resolver import AmbiguousLookupError, NotFoundLookupError, Resolver
 from .signature import Signature, append_default_args, extract_signature
@@ -148,7 +148,7 @@ class MethodsRegistry:
         for subsignature in self.get_all_subsignatures():
             self._resolver.register(subsignature)
 
-    def get_all_subsignatures(self):
+    def get_all_subsignatures(self) -> Iterator[Signature]:
         # Perform any pending registrations.
         for f, signature, precedence in self._all_methods:
 
@@ -232,7 +232,6 @@ class Function(metaclass=_FunctionMeta):
         Function._instances.append(self)
 
         self._f: Callable = f
-        self._raw_cache = {}
         wraps(f)(self)  # Sets `self._doc`.
 
         # `owner` is the name of the owner. We will later attempt to resolve to
@@ -327,9 +326,6 @@ class Function(metaclass=_FunctionMeta):
 
     def _clear_cache_dict(self):
         self._methods_registry.invalidate_resolver_and_cache()
-
-    def _resolve_pending_registrations(self):
-        pass
 
     def dispatch(
         self: Self, method: Optional[Callable] = None, precedence=0

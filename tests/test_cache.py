@@ -11,7 +11,7 @@ def assert_cache_performance(f, f_native):
 
     def resolve_registrations():
         for f in Function._instances:
-            f._resolve_pending_registrations()
+            f._resolver
 
     def setup_no_cache():
         clear_all_cache()
@@ -179,4 +179,4 @@ def test_cache_unfaithful():
     # Since `f` is not faithful, no cache should be accumulated.
     assert f(1) == 1
     assert f([1]) == 2
-    assert len(f._raw_cache) == 0
+    assert len(f._methods_registry._cache) == 0

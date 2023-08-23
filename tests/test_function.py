@@ -2,6 +2,7 @@ import abc
 import sys
 import textwrap
 import typing
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -9,12 +10,13 @@ import plum.resolver
 from plum import Dispatcher
 from plum.function import (
     Function,
+    MethodsRegistry,
     _change_function_name,
     _convert,
     _document,
     _owner_transfer,
 )
-from plum.resolver import AmbiguousLookupError, NotFoundLookupError, Resolver
+from plum.resolver import AmbiguousLookupError, NotFoundLookupError
 from plum.signature import Signature
 
 
@@ -641,7 +643,7 @@ def test_doc_in_resolver(monkeypatch):
     # simpler.
     monkeypatch.setattr(plum.function, "_document", lambda x: x.__doc__)
 
-    r = Resolver()
+    r = MethodsRegistry(function_name="something")
 
     class _MockFunction:
         def __init__(self, doc):
@@ -652,21 +654,24 @@ def test_doc_in_resolver(monkeypatch):
             self.implementation = _MockFunction(doc)
 
     # Circumvent the use of :meth:`.resolver.Resolver.register`.
-    r.signatures = [
-        _MockSignature("first"),
-        _MockSignature("second"),
-        _MockSignature("third"),
-    ]
+    r.get_all_subsignatures = MagicMock(
+        return_value=[
+            _MockSignature("first"),
+            _MockSignature("second"),
+            _MockSignature("third"),
+        ]
+    )
     assert r.doc() == "first\n\nsecond\n\nthird"
 
     # Test that duplicates are excluded.
-    r.signatures = [
+    all_subsignatures = [
         _MockSignature("first"),
         _MockSignature("second"),
         _MockSignature("second"),
         _MockSignature("third"),
     ]
+    r.get_all_subsignatures = MagicMock(return_value=all_subsignatures)
     assert r.doc() == "first\n\nsecond\n\nthird"
 
     # Test that the explicit exclusion mechanism also works.
-    assert r.doc(exclude=r.signatures[3].implementation) == "first\n\nsecond"
+    assert r.doc(exclude=all_subsignatures[3].implementation) == "first\n\nsecond"

@@ -7,7 +7,7 @@ from plum.promotion import _convert, _promotion_rule
 @pytest.fixture
 def convert():
     # Save methods.
-    all_methods = _convert._methods_registry._all_methods
+    all_methods = _convert._methods_registry._all_methods.copy()
 
     yield plum.convert
 
@@ -19,7 +19,7 @@ def convert():
 @pytest.fixture
 def promote():
     # Save methods.
-    all_methods = _promotion_rule._methods_registry._all_methods
+    all_methods = _promotion_rule._methods_registry._all_methods.copy()
 
     yield plum.promote
 
