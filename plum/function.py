@@ -354,7 +354,7 @@ class Function(metaclass=_FunctionMeta):
 
     def clear_cache(self) -> None:
         """Clear cache."""
-        self._methods_registry.resolver.clear_cache()
+        self._methods_registry.invalidate_resolver_and_cache()
 
     def register(
         self, f: Callable, signature: Optional[Signature] = None, precedence=0

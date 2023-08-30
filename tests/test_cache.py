@@ -148,7 +148,7 @@ def test_cache_clearing():
 
     # Clear via the dispatcher.
     dispatch.clear_cache()
-    assert f._methods_registry._resolver._cache == {}
+    assert f._methods_registry._resolver is None
 
     # Run the function again.
     assert f(1) == 1
@@ -157,7 +157,7 @@ def test_cache_clearing():
 
     # Clear via `clear_all_cache`.
     clear_all_cache()
-    assert f._methods_registry._resolver._cache == {}
+    assert f._methods_registry._resolver is None
 
     # Run the function one last time.
     assert f(1) == 1
