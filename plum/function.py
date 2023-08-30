@@ -111,8 +111,8 @@ a function (see :meth:`Function.owner`), make the corresponding value the owner.
 class MethodsRegistry:
     def __init__(self, function_name: str):
         self._all_methods: List[Tuple[Callable, Optional[Signature], int]] = []
-        self._resolver = None
-        self._function_name = function_name
+        self._resolver: Optional[Resolver] = None
+        self._function_name: str = function_name
 
     def add_method(
         self, method: Callable, signature: Optional[Signature], precedence: int
@@ -354,7 +354,7 @@ class Function(metaclass=_FunctionMeta):
 
     def clear_cache(self) -> None:
         """Clear cache."""
-        self._methods_registry.invalidate_resolver_and_cache()
+        self._methods_registry.resolver.clear_cache()
 
     def register(
         self, f: Callable, signature: Optional[Signature] = None, precedence=0

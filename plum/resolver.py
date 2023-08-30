@@ -32,6 +32,9 @@ class Resolver:
     def __len__(self) -> int:
         return len(self.signatures)
 
+    def clear_cache(self):
+        self._cache = {}
+
     def resolve_method_with_cache(
         self,
         args: Union[Tuple[object, ...], Signature, None] = None,
